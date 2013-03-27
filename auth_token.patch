@@ -1,0 +1,69 @@
+--- auth_token.py       2012-11-30 17:16:02.000000000 +0000
++++ auth_token.py       2013-03-26 13:48:18.958663911 +0000
+@@ -236,6 +236,8 @@
+
+         # Token caching via memcache
+         self._cache = None
++        self._cache_pool = None
++        self._cache_pool_threads = 20
+         self._iso8601 = None
+         memcache_servers = self._conf_get('memcache_servers')
+         # By default the token will be cached for 5 minutes
+@@ -246,10 +248,12 @@
+             datetime.timedelta(seconds=0)
+         if memcache_servers:
+             try:
+-                import memcache
++#                import memcache
++                import pylibmc
+                 import iso8601
+                 LOG.info('Using memcache for caching token')
+-                self._cache = memcache.Client(memcache_servers.split(','))
++                self._cache = pylibmc.Client(memcache_servers.split(','))
++                self._cache_pool = pylibmc.ClientPool(self._cache, self._cache_pool_threads)
+                 self._iso8601 = iso8601
+             except ImportError as e:
+                 LOG.warn('disabled caching due to missing libraries %s', e)
+@@ -596,9 +600,10 @@
+         If token is invalid raise InvalidUserToken
+         return token only if fresh (not expired).
+         """
+-        if self._cache and token:
++        if self._cache_pool and token:
+             key = 'tokens/%s' % token
+-            cached = self._cache.get(key)
++            with self._cache_pool.reserve() as mc:
++                cached = mc.get(key)
+             if cached == 'invalid':
+                 LOG.debug('Cached Token %s is marked unauthorized', token)
+                 raise InvalidUserToken('Token authorization failed')
+@@ -616,7 +621,7 @@
+         Stores the parsed expire date in cache allowing
+         quick check of token freshness on retrieval.
+         """
+-        if self._cache and data:
++        if self._cache_pool and data:
+             key = 'tokens/%s' % token
+             if 'token' in data.get('access', {}):
+                 timestamp = data['access']['token']['expires']
+@@ -625,16 +630,18 @@
+                 LOG.error('invalid token format')
+                 return
+             LOG.debug('Storing %s token in memcache', token)
+-            self._cache.set(key,
++            with self._cache_pool.reserve() as mc:
++                mc.set(key,
+                             (data, expires),
+                             time=self.token_cache_time)
+
+     def _cache_store_invalid(self, token):
+         """Store invalid token in cache."""
+-        if self._cache:
++        if self._cache_pool:
+             key = 'tokens/%s' % token
+             LOG.debug('Marking token %s as unauthorized in memcache', token)
+-            self._cache.set(key,
++            with self._cache_pool.reserve() as mc:
++                mc.set(key,
+                             'invalid',
+                             time=self.token_cache_time)
