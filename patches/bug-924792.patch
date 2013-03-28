@@ -1,6 +1,8 @@
---- ufo/gluster/swift/common/ring.py	2013-03-27 16:28:53.936248329 +0000
-+++ ufo/gluster/swift/common/ring.py	2013-03-27 23:13:06.559139026 +0000
-@@ -63,20 +63,52 @@
+diff --git a/ufo/gluster/swift/common/ring.py b/ufo/gluster/swift/common/ring.py
+index 9bac39c..fd6aae5 100644
+--- a/ufo/gluster/swift/common/ring.py
++++ b/ufo/gluster/swift/common/ring.py
+@@ -63,20 +63,52 @@ class Ring(ring.Ring):
                  hardware description
          ======  ===============================================================
          """
@@ -58,3 +60,27 @@
 +        Should never be called in the swift UFO environment
 +        """
 +        return self.false_node
+diff --git a/ufo/test/unit/common/test_ring.py b/ufo/test/unit/common/test_ring.py
+index 4fb964e..e6795fe 100644
+--- a/ufo/test/unit/common/test_ring.py
++++ b/ufo/test/unit/common/test_ring.py
+@@ -34,10 +34,18 @@ class TestRing(unittest.TestCase):
+         try:
+             __devs = self.ring._devs
+             self.ring._devs = _mock_ring_data()
++
+             part, node = self.ring.get_nodes('test')
+             assert node[0]['device'] == 'test'
++            node = self.ring.get_part_nodes(0)
++            assert node[0]['device'] == 'test'
++
+             part, node = self.ring.get_nodes('test2')
+-            assert node
+             assert node[0]['device'] == 'volume_not_in_ring'
++
++            part, node = self.ring.get_nodes('iops')
++            assert node[0]['device'] == 'iops'
++            node = self.ring.get_part_nodes(0)
++            assert node[0]['device'] == 'iops'
+         finally:
+             self.ring._devs = __devs
