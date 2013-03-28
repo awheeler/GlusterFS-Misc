@@ -61,10 +61,10 @@ index 9bac39c..fd6aae5 100644
 +        """
 +        return self.false_node
 diff --git a/ufo/test/unit/common/test_ring.py b/ufo/test/unit/common/test_ring.py
-index 4fb964e..e6795fe 100644
+index 4fb964e..46f711d 100644
 --- a/ufo/test/unit/common/test_ring.py
 +++ b/ufo/test/unit/common/test_ring.py
-@@ -34,10 +34,18 @@ class TestRing(unittest.TestCase):
+@@ -34,10 +34,22 @@ class TestRing(unittest.TestCase):
          try:
              __devs = self.ring._devs
              self.ring._devs = _mock_ring_data()
@@ -73,14 +73,18 @@ index 4fb964e..e6795fe 100644
              assert node[0]['device'] == 'test'
 +            node = self.ring.get_part_nodes(0)
 +            assert node[0]['device'] == 'test'
++            node = self.ring.get_more_nodes(0)
++            assert node[0]['device'] == 'volume_not_in_ring'
 +
              part, node = self.ring.get_nodes('test2')
 -            assert node
-             assert node[0]['device'] == 'volume_not_in_ring'
++            assert node[0]['device'] == 'volume_not_in_ring'
 +
 +            part, node = self.ring.get_nodes('iops')
 +            assert node[0]['device'] == 'iops'
 +            node = self.ring.get_part_nodes(0)
 +            assert node[0]['device'] == 'iops'
++            node = self.ring.get_more_nodes(0)
+             assert node[0]['device'] == 'volume_not_in_ring'
          finally:
              self.ring._devs = __devs
