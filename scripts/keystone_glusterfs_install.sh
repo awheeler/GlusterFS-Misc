@@ -27,6 +27,7 @@ mv object-server/1.conf-gluster object-server/1.conf
 rm {account,container,object}-server.conf
 
 yum install -y openstack-utils 
+openstack-config --set /etc/swift/proxy-server.conf DEFAULT bind_port 443
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file /etc/swift/cert.key
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT cert_file /etc/swift/cert.crt
 openstack-config --set /etc/swift/proxy-server.conf filter:cache memcache_servers 127.0.0.1:11211
