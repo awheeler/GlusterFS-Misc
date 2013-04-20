@@ -90,6 +90,7 @@ openstack-config --set /etc/keystone/keystone.conf sql connection mysql://keysto
 
 chkconfig openstack-keystone on
 service openstack-keystone start # If you script this, you'll want to wait a few seconds to start using it
+sleep 5
 
 #We are using untrusted certs, so tell keystone not to complain.  If you replace with trusted certs, or are not using SSL, set this to "".
 
@@ -141,11 +142,12 @@ mount=/opt/export
 if ! fgrep xvdf /etc/fstab > /dev/null; then
 	mkfs -t xfs -i size=512 /dev/xvdf -f
 	echo "/dev/xvdf         $mount          xfs     noatime,nodiratime      1 1" >> /etc/fstab
+	mkdir $mount
 fi
-
+mount $mount
 
 service glusterd start
-gluster volume create $volname $(uname -n):/opt/export/$volname
+gluster volume create $volname $(uname -n):/$mount/$volname
 gluster volume start $volname
 
 #Create the ring for the admin tenant.  If you have working multi-volume support, then you can specify multiple volume names in the call:
