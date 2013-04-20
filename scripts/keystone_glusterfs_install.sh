@@ -6,7 +6,8 @@
 ##This document assumes you already have GlusterFS with UFO installed, 3.3.1-11 or later, and are using the instructions here:
 
 ##  http://www.gluster.org/2012/09/howto-using-ufo-swift-a-quick-and-dirty-setup-guide/
-wget wget http://repos.fedorapeople.org/repos/kkeithle/glusterfs/epel-glusterfs.repo -O /etc/yum.repos.d/glusterfs-epel.repo
+yum install -y wget xfsprogs vim
+wget http://repos.fedorapeople.org/repos/kkeithle/glusterfs/epel-glusterfs.repo -O /etc/yum.repos.d/glusterfs-epel.repo
 yum install -y http://dl.fedoraproject.org/pub/epel/6/i386/epel-release-6-8.noarch.rpm
 
 ##Add the RDO Openstack Grizzly repos:
@@ -15,7 +16,7 @@ yum install -y http://rdo.fedorapeople.org/openstack/openstack-grizzly/rdo-relea
 yum install -y glusterfs glusterfs-server glusterfs-fuse glusterfs-swift glusterfs-swift-account glusterfs-swift-container glusterfs-swift-object glusterfs-swift-proxy glusterfs-ufo
 service start glusterd
 cd /etc/swift
-openssl req -new -x509 -nodes -out cert.crt -keyout cert.key < /dev/null < /dev/null < /dev/null
+printf "\n\n\n\n\n\n\n" | openssl req -new -x509 -nodes -out cert.crt -keyout cert.key
 
 mv swift.conf-gluster swift.conf
 mv fs.conf-gluster fs.conf
@@ -25,11 +26,12 @@ mv container-server/1.conf-gluster container-server/1.conf
 mv object-server/1.conf-gluster object-server/1.conf
 rm {account,container,object}-server.conf
 
+yum install -y openstack-utils 
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file /etc/swift/cert.key
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT cert_file /etc/swift/cert.crt
 openstack-config --set /etc/swift/proxy-server.conf filter:cache memcache_servers 127.0.0.1:11211
 
-service start memcached
+service memcached start
 
 
 ##These docs are largely derived from:
@@ -40,7 +42,7 @@ service start memcached
 
 #Install Openstack-Keystone
 
-yum install -y openstack-keystone openstack-utils python-keystoneclient
+yum install -y openstack-keystone python-keystoneclient
 
 #Configure keystone
 
@@ -54,7 +56,7 @@ export SERVICE_ENDPOINT=https://127.0.0.1:35357/v2.0/
 export SERVICE_TOKEN=\$ADMIN_TOKEN
 _EOF
 . ./keystonerc
-openstack-db --service keystone --init --yes
+openstack-db --service keystone --init --yes --rootpw glusterkey
 
 #Append the keystone configs to /etc/swift/proxy-server.conf
 
@@ -135,10 +137,16 @@ volname="admin"
 #volname=$admin_id
 
 #Create and start the admin volume:
+mount=/opt/export
+if ! fgrep xvdf /etc/fstab > /dev/null; then
+	mkfs -t xfs -i size=512 /dev/xvdf -f
+	echo "/dev/xvdf         $mount          xfs     noatime,nodiratime      1 1" >> /etc/fstab
+fi
 
+
+service glusterd start
 gluster volume create $volname $(uname -n):/opt/export/$volname
 gluster volume start $volname
-service openstack-keystone start
 
 #Create the ring for the admin tenant.  If you have working multi-volume support, then you can specify multiple volume names in the call:
 
