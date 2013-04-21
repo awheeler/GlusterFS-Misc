@@ -1,3 +1,16 @@
+#!/bin/bash
+
+secure=0
+
+http=https
+port=443
+ssl='True'
+if [ $secure -eq 0 ]; then
+	http=http
+	port=8080
+	ssl='False'
+fi
+
 ##This is a document in progress, and may contain some errors or missing information.
 
 ##I am currently in the process of building an AWS Image with this installed.
@@ -27,7 +40,7 @@ mv object-server/1.conf-gluster object-server/1.conf
 rm {account,container,object}-server.conf
 
 yum install -y openstack-utils 
-openstack-config --set /etc/swift/proxy-server.conf DEFAULT bind_port 443
+openstack-config --set /etc/swift/proxy-server.conf DEFAULT bind_port $port
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file /etc/swift/cert.key
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT cert_file /etc/swift/cert.crt
 openstack-config --set /etc/swift/proxy-server.conf filter:cache memcache_servers 127.0.0.1:11211
@@ -52,8 +65,8 @@ export ADMIN_TOKEN=$(openssl rand -hex 10)
 export OS_USERNAME=admin
 export OS_PASSWORD=$(openssl rand -hex 10)
 export OS_TENANT_NAME=admin
-export OS_AUTH_URL=https://127.0.0.1:5000/v2.0/
-export SERVICE_ENDPOINT=https://127.0.0.1:35357/v2.0/
+export OS_AUTH_URL=$http://127.0.0.1:5000/v2.0/
+export SERVICE_ENDPOINT=$http://127.0.0.1:35357/v2.0/
 export SERVICE_TOKEN=\$ADMIN_TOKEN
 _EOF
 . ./keystonerc
@@ -70,7 +83,7 @@ operator_roles = admin, swiftoperator
 paste.filter_factory = keystoneclient.middleware.auth_token:filter_factory
 auth_port = 35357
 auth_host = 127.0.0.1
-auth_protocol = https
+auth_protocol = $http
 _EOM
 
 #Finish configuring both swift and keystone using the command-line tool:
@@ -81,7 +94,7 @@ openstack-config --set /etc/swift/proxy-server.conf DEFAULT log_name proxy_serve
 openstack-config --set /etc/swift/proxy-server.conf filter:authtoken signing_dir /etc/swift
   
 openstack-config --set /etc/keystone/keystone.conf DEFAULT admin_token $ADMIN_TOKEN
-openstack-config --set /etc/keystone/keystone.conf ssl enable True
+openstack-config --set /etc/keystone/keystone.conf ssl enable $ssl
 openstack-config --set /etc/keystone/keystone.conf ssl keyfile /etc/swift/cert.key
 openstack-config --set /etc/keystone/keystone.conf ssl certfile /etc/swift/cert.crt
 openstack-config --set /etc/keystone/keystone.conf signing token_format UUID
@@ -101,10 +114,10 @@ INSECURE="--insecure"
 
 KS_SERVICEID=$(keystone $INSECURE service-create --name=keystone --type=identity --description="Keystone Identity Service" | grep " id " | cut -d "|" -f 3)
 SW_SERVICEID=$(keystone $INSECURE service-create --name=swift --type=object-store --description="Swift Service" | grep " id " | cut -d "|" -f 3)
-endpoint="https://127.0.0.1:443"
+endpoint="$http://127.0.0.1:$port"
 keystone $INSECURE endpoint-create --service_id $KS_SERVICEID \
-    --publicurl $endpoint'/v2.0' --adminurl https://127.0.0.1:35357/v2.0 \
-    --internalurl https://127.0.0.1:5000/v2.0
+    --publicurl $endpoint'/v2.0' --adminurl $http://127.0.0.1:35357/v2.0 \
+    --internalurl $http://127.0.0.1:5000/v2.0
 keystone $INSECURE endpoint-create --service_id $SW_SERVICEID \
     --publicurl $endpoint'/v1/AUTH_$(tenant_id)s' \
     --adminurl $endpoint'/v1/AUTH_$(tenant_id)s' \
@@ -165,9 +178,14 @@ keystone $INSECURE user-role-add --user-id $user_id --tenant-id $admin_id \
 
 #Test the user:
 
-curl $INSECURE -d '{"auth":{"tenantName": "admin", "passwordCredentials":{"username": "testadmin", "password": "testadmin"}}}' -H "Content-type: application/json" https://127.0.0.1:5000/v2.0/tokens
+curl $INSECURE -d '{"auth":{"tenantName": "admin", "passwordCredentials":{"username": "testadmin", "password": "testadmin"}}}' -H "Content-type: application/json" $http://127.0.0.1:5000/v2.0/tokens
 
 #See here for more examples:
 
 #  http://docs.openstack.org/developer/keystone/api_curl_examples.html
 
+# Install the support for swift-bench
+yum install -y python-swiftclient
+
+# Make our cert trusted so swift-bench doesn't complain
+#cat /etc/swift/cert.crt >> /etc/pki/tls/certs/ca-bundle.crt
