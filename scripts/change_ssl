@@ -1,0 +1,63 @@
+#!/bin/bash
+
+secure=$1
+
+if [ -z "$secure" ]; then
+	echo "$0 <enable|disable>"
+	exit 1
+fi
+
+if [ "$secure" == "enable" ]; then
+	secure=1
+else
+	secure=0
+fi 
+
+INSECURE="--insecure"
+http=https
+port=443
+ssl='True'
+cert_file=/etc/pki/tls/certs/swift.crt
+key_file=/etc/pki/tls/private/swift.key
+if [ $secure -eq 0 ]; then
+	http=http
+	port=8080
+	ssl='False'
+	openstack-config --del /etc/swift/proxy-server.conf DEFAULT key_file
+	openstack-config --del /etc/swift/proxy-server.conf DEFAULT cert_file
+else
+	openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file $key_file
+	openstack-config --set /etc/swift/proxy-server.conf DEFAULT cert_file $cert_file
+fi
+
+openstack-config --set /etc/swift/proxy-server.conf DEFAULT bind_port $port
+openstack-config --set /etc/swift/proxy-server.conf filter:authtoken auth_protocol $http
+
+openstack-config --set /etc/keystone/keystone.conf ssl enable $ssl
+openstack-config --set /etc/keystone/keystone.conf ssl keyfile $key_file
+openstack-config --set /etc/keystone/keystone.conf ssl certfile $cert_file
+perl -spi -e "s/OS_AUTH_URL=https?:/OS_AUTH_URL=$http:/" /etc/swift/keystonerc
+perl -spi -e "s/SERVICE_ENDPOINT=https?:/SERVICE_ENDPOINT=$http:/" /etc/swift/keystonerc
+
+# Delete the old endpoints
+KS_SERVICEID=$(keystone $INSECURE service-list | awk '/ keystone / {print $2}')
+SW_SERVICEID=$(keystone $INSECURE service-list | awk '/ swift / {print $2}')
+
+keystone $INSECURE endpoint-delete $(keystone $INSECURE endpoint-list | awk '/'$KS_SERVICEID'/ {print $2}')
+keystone $INSECURE endpoint-delete $(keystone $INSECURE endpoint-list | awk '/'$SW_SERVICEID'/ {print $2}')
+
+# Re-create the endpoints
+endpoint="$http://127.0.0.1:$port"
+keystone $INSECURE endpoint-create --service_id $KS_SERVICEID \
+    --publicurl $endpoint'/v2.0' --adminurl $http://127.0.0.1:35357/v2.0 \
+    --internalurl $http://127.0.0.1:5000/v2.0
+keystone $INSECURE endpoint-create --service_id $SW_SERVICEID \
+    --publicurl $endpoint'/v1/AUTH_$(tenant_id)s' \
+    --adminurl $endpoint'/v1/AUTH_$(tenant_id)s' \
+    --internalurl $endpoint'/v1/AUTH_$(tenant_id)s'
+
+service memcached restart
+service openstack-keystone restart
+swift-init main restart
+
+echo ". /etc/swift/keystonerc"
