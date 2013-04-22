@@ -103,7 +103,7 @@ openstack-config --set /etc/swift/proxy-server.conf pipeline:main pipeline "heal
 openstack-config --set /etc/keystone/keystone.conf DEFAULT admin_token $ADMIN_TOKEN
 openstack-config --set /etc/keystone/keystone.conf ssl enable $ssl
 if [ $secure -eq 1 ]; then
-	openstack-config --set /etc/keystone/keystone.conf ssl keyfile $cert_key
+	openstack-config --set /etc/keystone/keystone.conf ssl keyfile $key_file
 	openstack-config --set /etc/keystone/keystone.conf ssl certfile $cert_file
 fi
 openstack-config --set /etc/keystone/keystone.conf signing token_format UUID
