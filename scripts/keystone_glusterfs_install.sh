@@ -96,6 +96,7 @@ openstack-config --set /etc/swift/proxy-server.conf filter:authtoken admin_token
 openstack-config --set /etc/swift/proxy-server.conf filter:authtoken auth_token $ADMIN_TOKEN
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT log_name proxy_server
 openstack-config --set /etc/swift/proxy-server.conf filter:authtoken signing_dir /etc/swift
+openstack-config --set /etc/swift/proxy-server.conf pipeline:main pipeline "healthcheck cache authtoken keystone proxy-server"
   
 openstack-config --set /etc/keystone/keystone.conf DEFAULT admin_token $ADMIN_TOKEN
 openstack-config --set /etc/keystone/keystone.conf ssl enable $ssl
