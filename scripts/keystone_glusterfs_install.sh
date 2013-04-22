@@ -179,6 +179,13 @@ gluster volume start $volname
 
 cd /etc/swift
 /usr/bin/gluster-swift-gen-builders $volname
+
+# Fix a small bug caused by our using a newer version of keystone, details here:
+# https://github.com/openstack/swift/commit/a064fa4227c4960052e2089d2b05bc684706f13e
+if ! fgrep "hasattr(record, 'server'" /usr/lib/python2.6/site-packages/swift/common/utils.py > /dev/null; then
+	perl -spi -e "s/^(        msg = logging.Formatter.format)/        if not hasattr(record, 'server'):\n            record.server = record.name\n            return logging.Formatter.format(self, record)\n\$1/" /usr/lib/python2.6/site-packages/swift/common/utils.py
+fi
+
 swift-init main restart
 
 #Create a testadmin user associated with the admin tenant with password testadmin and admin role:
