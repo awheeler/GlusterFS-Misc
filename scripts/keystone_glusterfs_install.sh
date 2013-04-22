@@ -33,7 +33,7 @@ yum install -y http://rdo.fedorapeople.org/openstack/openstack-grizzly/rdo-relea
 yum install -y glusterfs glusterfs-server glusterfs-fuse glusterfs-swift glusterfs-swift-account glusterfs-swift-container glusterfs-swift-object glusterfs-swift-proxy glusterfs-ufo
 service start glusterd
 cd /etc/swift
-printf "\n\n\n\n\n\n\n" | openssl req -new -x509 -nodes -out $cert_file -keyout $cert_key
+printf "\n\n\n\n\n\n\n" | openssl req -new -x509 -nodes -out $cert_file -keyout $key_file
 
 mv swift.conf-gluster swift.conf
 mv fs.conf-gluster fs.conf
