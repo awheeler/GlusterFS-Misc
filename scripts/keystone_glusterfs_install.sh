@@ -5,6 +5,8 @@ secure=0
 http=https
 port=443
 ssl='True'
+multivol=0
+admin_tenant=admin
 if [ $secure -eq 0 ]; then
 	http=http
 	port=8080
@@ -66,7 +68,7 @@ cat > keystonerc << _EOF
 export ADMIN_TOKEN=$(openssl rand -hex 10)
 export OS_USERNAME=admin
 export OS_PASSWORD=$(openssl rand -hex 10)
-export OS_TENANT_NAME=admin
+export OS_TENANT_NAME=$admin_tenant
 export OS_AUTH_URL=$http://127.0.0.1:5000/v2.0/
 export SERVICE_ENDPOINT=$http://127.0.0.1:35357/v2.0/
 export SERVICE_TOKEN=\$ADMIN_TOKEN
@@ -129,7 +131,7 @@ keystone $INSECURE endpoint-create --service_id $SW_SERVICEID \
 
 #Create the admin tenant:
 
-admin_id=$(keystone $INSECURE tenant-create --name admin --description "Internal Admin Tenant" | grep id | awk '{print $4}')
+admin_id=$(keystone $INSECURE tenant-create --name $admin_tenant --description "Internal Admin Tenant" | grep id | awk '{print $4}')
 
 #Create the admin roles:
 
@@ -151,9 +153,11 @@ keystone $INSECURE user-role-add --user-id $user_id --tenant-id $admin_id \
 #If you do not have multi-volume support (broken in 3.3.1-11), then the volume names will not correlate to the tenants, and all tenants will map to the same volume, so just use a normal name.
 #(This will be fixed in 3.4, and should be fixed in 3.4 Beta.  The bug report for this is here: https://bugzilla.redhat.com/show_bug.cgi?id=924792)
 
-volname="admin"
-#  or if you have the multi-volume patch
-#volname=$admin_id
+#  If you have the multi-volume patch
+volname=$admin_id
+if [ "$multivol" -eq 0 ]; then
+	volname="$admin_tenant"
+fi
 
 #Create and start the admin volume:
 mount=/opt/export
@@ -171,7 +175,7 @@ gluster volume start $volname
 #Create the ring for the admin tenant.  If you have working multi-volume support, then you can specify multiple volume names in the call:
 
 cd /etc/swift
-/usr/bin/gluster-swift-gen-builders $admin_id
+/usr/bin/gluster-swift-gen-builders $volname
 swift-init main restart
 
 #Create a testadmin user associated with the admin tenant with password testadmin and admin role:
@@ -182,7 +186,7 @@ keystone $INSECURE user-role-add --user-id $user_id --tenant-id $admin_id \
 
 #Test the user:
 
-curl $INSECURE -d '{"auth":{"tenantName": "admin", "passwordCredentials":{"username": "testadmin", "password": "testadmin"}}}' -H "Content-type: application/json" $http://127.0.0.1:5000/v2.0/tokens
+curl $INSECURE -d '{"auth":{"tenantName": "'$admin_tenant'", "passwordCredentials":{"username": "testadmin", "password": "testadmin"}}}' -H "Content-type: application/json" $http://127.0.0.1:5000/v2.0/tokens
 
 #See here for more examples:
 
