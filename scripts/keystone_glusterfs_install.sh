@@ -198,3 +198,18 @@ yum install -y python-swiftclient
 
 # Make our cert trusted so swift-bench doesn't complain
 #cat /etc/swift/cert.crt >> /etc/pki/tls/certs/ca-bundle.crt
+
+cd /tmp
+cat > test.bench << _EOM_
+[bench]
+auth = $http://127.0.0.1:5000/v2.0/
+user = admin:testadmin
+key = testadmin
+concurrency = 10
+object_size = 1
+num_objects = 1000
+num_gets = 10000
+delete = yes
+auth_version = 2.0
+_EOM_
+# swift-bench /tmp/test.bench
