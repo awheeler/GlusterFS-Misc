@@ -41,8 +41,10 @@ rm {account,container,object}-server.conf
 
 yum install -y openstack-utils 
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT bind_port $port
-openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file /etc/swift/cert.key
-openstack-config --set /etc/swift/proxy-server.conf DEFAULT cert_file /etc/swift/cert.crt
+if [ $secure -eq 1 ]; then
+	openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file /etc/swift/cert.key
+	openstack-config --set /etc/swift/proxy-server.conf DEFAULT cert_file /etc/swift/cert.crt
+fi
 openstack-config --set /etc/swift/proxy-server.conf filter:cache memcache_servers 127.0.0.1:11211
 
 service memcached start
@@ -95,8 +97,10 @@ openstack-config --set /etc/swift/proxy-server.conf filter:authtoken signing_dir
   
 openstack-config --set /etc/keystone/keystone.conf DEFAULT admin_token $ADMIN_TOKEN
 openstack-config --set /etc/keystone/keystone.conf ssl enable $ssl
-openstack-config --set /etc/keystone/keystone.conf ssl keyfile /etc/swift/cert.key
-openstack-config --set /etc/keystone/keystone.conf ssl certfile /etc/swift/cert.crt
+if [ $secure -eq 1 ]; then
+	openstack-config --set /etc/keystone/keystone.conf ssl keyfile /etc/swift/cert.key
+	openstack-config --set /etc/keystone/keystone.conf ssl certfile /etc/swift/cert.crt
+fi
 openstack-config --set /etc/keystone/keystone.conf signing token_format UUID
 openstack-config --set /etc/keystone/keystone.conf sql connection mysql://keystone:keystone@127.0.0.1/keystone
 
