@@ -33,7 +33,7 @@ yum install -y http://rdo.fedorapeople.org/openstack/openstack-grizzly/rdo-relea
 yum install -y glusterfs glusterfs-server glusterfs-fuse glusterfs-swift glusterfs-swift-account glusterfs-swift-container glusterfs-swift-object glusterfs-swift-proxy glusterfs-ufo
 service start glusterd
 cd /etc/swift
-printf "\n\n\n\n\n\n\n" | openssl req -new -x509 -nodes -out $cert_file -keyout $key_file
+printf "\n\n\n\n\n127.0.0.1\n\n" | openssl req -new -x509 -nodes -out $cert_file -keyout $key_file
 
 mv swift.conf-gluster swift.conf
 mv fs.conf-gluster fs.conf
@@ -206,7 +206,7 @@ curl $INSECURE -d '{"auth":{"tenantName": "'$admin_tenant'", "passwordCredential
 yum install -y python-swiftclient
 
 # Make our cert trusted so swift-bench doesn't complain
-#cat $cert_file >> /etc/pki/tls/certs/ca-bundle.crt
+cat $cert_file >> /etc/pki/tls/certs/ca-bundle.crt
 
 cd /tmp
 cat > test.bench << _EOM_
