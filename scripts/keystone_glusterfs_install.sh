@@ -2,10 +2,12 @@
 
 secure=0
 
+cert_file=/etc/pki/tls/certs/swift.crt
+key_file=/etc/pki/tls/private/swift.key
+multivol=0
 http=https
 port=443
 ssl='True'
-multivol=0
 admin_tenant=admin
 if [ $secure -eq 0 ]; then
 	http=http
@@ -31,7 +33,7 @@ yum install -y http://rdo.fedorapeople.org/openstack/openstack-grizzly/rdo-relea
 yum install -y glusterfs glusterfs-server glusterfs-fuse glusterfs-swift glusterfs-swift-account glusterfs-swift-container glusterfs-swift-object glusterfs-swift-proxy glusterfs-ufo
 service start glusterd
 cd /etc/swift
-printf "\n\n\n\n\n\n\n" | openssl req -new -x509 -nodes -out cert.crt -keyout cert.key
+printf "\n\n\n\n\n\n\n" | openssl req -new -x509 -nodes -out $cert_file -keyout $cert_key
 
 mv swift.conf-gluster swift.conf
 mv fs.conf-gluster fs.conf
@@ -44,8 +46,8 @@ rm {account,container,object}-server.conf
 yum install -y openstack-utils 
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT bind_port $port
 if [ $secure -eq 1 ]; then
-	openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file /etc/swift/cert.key
-	openstack-config --set /etc/swift/proxy-server.conf DEFAULT cert_file /etc/swift/cert.crt
+	openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file $cert_key
+	openstack-config --set /etc/swift/proxy-server.conf DEFAULT cert_file $cert_file
 fi
 openstack-config --set /etc/swift/proxy-server.conf filter:cache memcache_servers 127.0.0.1:11211
 
@@ -101,8 +103,8 @@ openstack-config --set /etc/swift/proxy-server.conf pipeline:main pipeline "heal
 openstack-config --set /etc/keystone/keystone.conf DEFAULT admin_token $ADMIN_TOKEN
 openstack-config --set /etc/keystone/keystone.conf ssl enable $ssl
 if [ $secure -eq 1 ]; then
-	openstack-config --set /etc/keystone/keystone.conf ssl keyfile /etc/swift/cert.key
-	openstack-config --set /etc/keystone/keystone.conf ssl certfile /etc/swift/cert.crt
+	openstack-config --set /etc/keystone/keystone.conf ssl keyfile $cert_key
+	openstack-config --set /etc/keystone/keystone.conf ssl certfile $cert_file
 fi
 openstack-config --set /etc/keystone/keystone.conf signing token_format UUID
 openstack-config --set /etc/keystone/keystone.conf sql connection mysql://keystone:keystone@127.0.0.1/keystone
@@ -197,7 +199,7 @@ curl $INSECURE -d '{"auth":{"tenantName": "'$admin_tenant'", "passwordCredential
 yum install -y python-swiftclient
 
 # Make our cert trusted so swift-bench doesn't complain
-#cat /etc/swift/cert.crt >> /etc/pki/tls/certs/ca-bundle.crt
+#cat $cert_file >> /etc/pki/tls/certs/ca-bundle.crt
 
 cd /tmp
 cat > test.bench << _EOM_
@@ -213,3 +215,4 @@ delete = yes
 auth_version = 2.0
 _EOM_
 # swift-bench /tmp/test.bench
+
