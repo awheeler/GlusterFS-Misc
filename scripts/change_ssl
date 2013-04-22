@@ -60,4 +60,19 @@ service memcached restart
 service openstack-keystone restart
 swift-init main restart
 
+cd /tmp
+cat > test.bench << _EOM_
+[bench]
+auth = $http://127.0.0.1:5000/v2.0/
+user = admin:testadmin
+key = testadmin
+concurrency = 10
+object_size = 1
+num_objects = 1000
+num_gets = 10000
+delete = yes
+auth_version = 2.0
+_EOM_
+
 echo ". /etc/swift/keystonerc"
+
