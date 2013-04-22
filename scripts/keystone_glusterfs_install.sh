@@ -46,7 +46,7 @@ rm {account,container,object}-server.conf
 yum install -y openstack-utils 
 openstack-config --set /etc/swift/proxy-server.conf DEFAULT bind_port $port
 if [ $secure -eq 1 ]; then
-	openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file $cert_key
+	openstack-config --set /etc/swift/proxy-server.conf DEFAULT key_file $key_file
 	openstack-config --set /etc/swift/proxy-server.conf DEFAULT cert_file $cert_file
 fi
 openstack-config --set /etc/swift/proxy-server.conf filter:cache memcache_servers 127.0.0.1:11211
