@@ -1,33 +1,20 @@
 diff --git a/ufo/gluster/swift/common/ring.py b/ufo/gluster/swift/common/ring.py
-index 9bac39c..fd6aae5 100644
+index 9bac39c..06aab8d 100644
 --- a/ufo/gluster/swift/common/ring.py
 +++ b/ufo/gluster/swift/common/ring.py
-@@ -63,20 +63,52 @@ class Ring(ring.Ring):
-                 hardware description
-         ======  ===============================================================
-         """
--        false_node = [{'zone': 1, 'weight': 100.0, 'ip': '127.0.0.1', 'id': 0, \
-+        self.false_node = [{'zone': 1, 'weight': 100.0, 'ip': '127.0.0.1', 'id': 0, \
-                            'meta': '', 'device': 'volume_not_in_ring', \
-                            'port': 6012}]
-         if account.startswith(reseller_prefix):
--            acc_name = account.replace(reseller_prefix, '', 1)
-+            self.acc_name = account.replace(reseller_prefix, '', 1)
-         else:
--            acc_name = account
-+            self.acc_name = account
+@@ -37,6 +37,29 @@ if not reseller_prefix.endswith('_'):
+     reseller_prefix = reseller_prefix + '_'
  
-         part = 0
-         seen_ids = set()
-         nodes = [dev for dev in self._devs \
--                     if dev['device'] == acc_name \
+ class Ring(ring.Ring):
++    def _get_part_nodes(self, part):
++        seen_ids = set()
++        nodes = [dev for dev in self._devs \
 +                     if dev['device'] == self.acc_name \
-                      and not (dev['id'] in seen_ids \
-                                   or seen_ids.add(dev['id']))]
-         if not nodes:
--            nodes = false_node
-+            nodes = self.false_node
-         return part, nodes
++                     and not (dev['id'] in seen_ids \
++                                  or seen_ids.add(dev['id']))]
++        if not nodes:
++            nodes = [self.false_node]
++        return nodes
 +
 +    def get_part_nodes(self, part):
 +        """
@@ -40,14 +27,38 @@ index 9bac39c..fd6aae5 100644
 +
 +        See :func:`get_nodes` for a description of the node dicts.
 +        """
-+        seen_ids = set()
-+        nodes = [dev for dev in self._devs \
-+                     if dev['device'] == self.acc_name \
-+                     and not (dev['id'] in seen_ids \
-+                                  or seen_ids.add(dev['id']))]
-+        if not nodes:
-+            nodes = self.false_node
-+        return nodes
++        return self._get_part_nodes(part)
++
+     def get_nodes(self, account, container=None, obj=None):
+         """
+         Get the partition and nodes for an account/container/object.
+@@ -63,20 +86,26 @@ class Ring(ring.Ring):
+                 hardware description
+         ======  ===============================================================
+         """
+-        false_node = [{'zone': 1, 'weight': 100.0, 'ip': '127.0.0.1', 'id': 0, \
++        self.false_node = {'zone': 1, 'weight': 100.0, 'ip': '127.0.0.1', 'id': 0, \
+                            'meta': '', 'device': 'volume_not_in_ring', \
+-                           'port': 6012}]
++                           'port': 6012}
+         if account.startswith(reseller_prefix):
+-            acc_name = account.replace(reseller_prefix, '', 1)
++            self.acc_name = account.replace(reseller_prefix, '', 1)
+         else:
+-            acc_name = account
++            self.acc_name = account
+ 
+         part = 0
+-        seen_ids = set()
+-        nodes = [dev for dev in self._devs \
+-                     if dev['device'] == acc_name \
+-                     and not (dev['id'] in seen_ids \
+-                                  or seen_ids.add(dev['id']))]
+-        if not nodes:
+-            nodes = false_node
+-        return part, nodes
++        return part, self._get_part_nodes(part)
++
 +
 +    def get_more_nodes(self, part):
 +        """
@@ -57,14 +68,19 @@ index 9bac39c..fd6aae5 100644
 +        :returns: generator of node dicts
 +
 +        See :func:`get_nodes` for a description of the node dicts.
-+        Should never be called in the swift UFO environment
++        Should never be called in the swift UFO environment, so yield nothing
 +        """
-+        return self.false_node
++        yield self.false_node
 diff --git a/ufo/test/unit/common/test_ring.py b/ufo/test/unit/common/test_ring.py
-index 4fb964e..404a691 100644
+index 4fb964e..48ed952 100644
 --- a/ufo/test/unit/common/test_ring.py
 +++ b/ufo/test/unit/common/test_ring.py
-@@ -34,10 +34,24 @@ class TestRing(unittest.TestCase):
+@@ -30,14 +30,52 @@ class TestRing(unittest.TestCase):
+     def setUp(self):
+         self.ring = Ring(SWIFT_DIR, ring_name='object')
+ 
+-    def test_get_notes(self):
++    def test_first_device(self):
          try:
              __devs = self.ring._devs
              self.ring._devs = _mock_ring_data()
@@ -73,20 +89,44 @@ index 4fb964e..404a691 100644
              assert node[0]['device'] == 'test'
 +            node = self.ring.get_part_nodes(0)
 +            assert node[0]['device'] == 'test'
-+            node = self.ring.get_more_nodes(0)
-+            assert node[0]['device'] == 'volume_not_in_ring'
++            for node in self.ring.get_more_nodes(0):
++                assert node['device'] == 'volume_not_in_ring'
++        finally:
++            self.ring._devs = __devs
++
++    def test_invalid_device(self):
++        try:
++            __devs = self.ring._devs
++            self.ring._devs = _mock_ring_data()
 +
              part, node = self.ring.get_nodes('test2')
 -            assert node
-+            assert node[0]['device'] == 'volume_not_in_ring'
+             assert node[0]['device'] == 'volume_not_in_ring'
 +            node = self.ring.get_part_nodes(0)
 +            assert node[0]['device'] == 'volume_not_in_ring'
++        finally:
++            self.ring._devs = __devs
++
++    def test_second_device(self):
++        try:
++            __devs = self.ring._devs
++            self.ring._devs = _mock_ring_data()
++
++            part, node = self.ring.get_nodes('iops')
++            assert node[0]['device'] == 'iops'
++            node = self.ring.get_part_nodes(0)
++            assert node[0]['device'] == 'iops'
++            for node in self.ring.get_more_nodes(0):
++                assert node['device'] == 'volume_not_in_ring'
++        finally:
++            self.ring._devs = __devs
++
++    def test_second_device_with_reseller_prefix(self):
++        try:
++            __devs = self.ring._devs
++            self.ring._devs = _mock_ring_data()
 +
 +            part, node = self.ring.get_nodes('AUTH_iops')
 +            assert node[0]['device'] == 'iops'
-+            node = self.ring.get_part_nodes(0)
-+            assert node[0]['device'] == 'iops'
-+            node = self.ring.get_more_nodes(0)
-             assert node[0]['device'] == 'volume_not_in_ring'
          finally:
              self.ring._devs = __devs
