@@ -1,0 +1,72 @@
+diff --git a/ufo/etc/fs.conf-gluster b/ufo/etc/fs.conf-gluster
+index bbbdc2b..54822a4 100644
+--- a/ufo/etc/fs.conf-gluster
++++ b/ufo/etc/fs.conf-gluster
+@@ -3,10 +3,6 @@
+ # local host.
+ mount_ip = localhost
+ 
+-# The GlusterFS server need not be local, a remote server can also be used
+-# by setting "remote_cluster = yes".
+-remote_cluster = no
+-
+ # By default it is assumed the Gluster volumes can be accessed using other
+ # methods besides UFO (not object only), which disables a caching
+ # optimizations in order to keep in sync with file system changes.
+diff --git a/ufo/gluster/swift/common/Glusterfs.py b/ufo/gluster/swift/common/Glusterfs.py
+index ce2c8e1..460956a 100644
+--- a/ufo/gluster/swift/common/Glusterfs.py
++++ b/ufo/gluster/swift/common/Glusterfs.py
+@@ -24,7 +24,6 @@ from gluster.swift.common.fs_utils import mkdirs
+ #
+ _fs_conf = ConfigParser()
+ MOUNT_IP = 'localhost'
+-REMOTE_CLUSTER = False
+ OBJECT_ONLY = False
+ RUN_DIR='/var/run/swift'
+ SWIFT_DIR = '/etc/swift'
+@@ -34,10 +33,6 @@ if _fs_conf.read(os.path.join('/etc/swift', 'fs.conf')):
+     except (NoSectionError, NoOptionError):
+         pass
+     try:
+-        REMOTE_CLUSTER = _fs_conf.get('DEFAULT', 'remote_cluster', False) in TRUE_VALUES
+-    except (NoSectionError, NoOptionError):
+-        pass
+-    try:
+         OBJECT_ONLY = _fs_conf.get('DEFAULT', 'object_only', "no") in TRUE_VALUES
+     except (NoSectionError, NoOptionError):
+         pass
+@@ -106,19 +101,12 @@ def unmount(full_mount_path):
+         logging.error('Unable to unmount %s %s' % (full_mount_path, NAME))
+ 
+ def _get_export_list():
+-    if REMOTE_CLUSTER:
+-        cmnd = 'gluster --remote-host=%s volume info' % MOUNT_IP
+-    else:
+-        cmnd = 'gluster volume info'
++    cmnd = 'gluster --remote-host=%s volume info' % MOUNT_IP
+ 
+     export_list = []
+ 
+     if os.system(cmnd + ' >> /dev/null'):
+-        if REMOTE_CLUSTER:
+-            logging.error('Getting volume info failed for %s, make sure '\
+-                          'gluster --remote-host=%s works', NAME, MOUNT_IP)
+-        else:
+-            logging.error('Getting volume info failed for %s', NAME)
++        logging.error('Getting volume info failed for %s', NAME)
+     else:
+         fp = os.popen(cmnd)
+         while True:
+diff --git a/ufo/test/unit/common/test_ring.py b/ufo/test/unit/common/test_ring.py
+index d3dac60..4fb964e 100644
+--- a/ufo/test/unit/common/test_ring.py
++++ b/ufo/test/unit/common/test_ring.py
+@@ -38,6 +38,6 @@ class TestRing(unittest.TestCase):
+             assert node[0]['device'] == 'test'
+             part, node = self.ring.get_nodes('test2')
+             assert node
+-            assert node[0]['device'] == 'volume'
++            assert node[0]['device'] == 'volume_not_in_ring'
+         finally:
+             self.ring._devs = __devs
